@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tank Promo</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #000;
+      color: #fff;
+    }
+    #main, #uploadScreen, #codeScreen {
+      padding: 20px;
+    }
+    #main {
+      min-height: 100vh;
+      position: relative;
+    }
+    .card {
+      width: 200px;
+      border-radius: 10px;
+      margin: 10px;
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: top;
+      box-shadow: 0 0 10px #000;
+      cursor: pointer;
+      position: relative;
+    }
+    .card-title {
+      padding: 6px;
+      font-weight: bold;
+      font-size: 16px;
+      text-align: center;
+      position: relative;
+    }
+    .card img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      display: block;
+    }
+    .card button {
+      width: 100%;
+      padding: 8px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    #uploadScreen, #codeScreen {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: black;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 1000;
+    }
+    #thumbPreview {
+      width: 200px;
+      height: 120px;
+      border: 2px dashed #555;
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+    #thumbPreview img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: cover;
+    }
+    input, button {
+      margin: 5px;
+      padding: 5px;
+    }
+    #cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    #returnUploadBtn {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: #333;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+    #returnCodeBtn {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: #333;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+    #codeButton {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #444; /* slightly lighter so you can see it */
+      color: white;
+      padding: 5px 10px;
+      border: none;
+      cursor: pointer;
+      z-index: 2000; /* high to stay on top */
+    }
+
+    #ownerStarIcon {
+      display: none;
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      cursor: pointer;
+      z-index: 999;
+      width: 80px;  /* bigger */
+      height: 80px; /* bigger */
+      filter:
+        drop-shadow(0 0 10px #ffff33)
+        drop-shadow(0 0 20px #ffff33)
+        drop-shadow(0 0 30px #ffff33);
+    }
+
+    @keyframes pulseStar {
+      0%, 100% {
+        filter:
+          drop-shadow(0 0 10px #ffff33)
+          drop-shadow(0 0 20px #ffff33)
+          drop-shadow(0 0 30px #ffff33);
+        transform: translateX(-50%) scale(1);
+      }
+      50% {
+        filter:
+          drop-shadow(0 0 25px #fff700)
+          drop-shadow(0 0 40px #fff700)
+          drop-shadow(0 0 60px #fff700);
+        transform: translateX(-50%) scale(1.2);
+      }
+    }
+
+    #ownerStarIcon.pulse {
+      animation: pulseStar 2s infinite ease-in-out;
+    }
+
+    @keyframes spinStar {
+      from { transform: translateX(-50%) rotate(0deg); }
+      to { transform: translateX(-50%) rotate(360deg); }
+    }
+
+    .spin {
+      animation: spinStar 1s ease-in-out;
+    }
+
+  </style>
+</head>
+<body>
+
+
+<div id="uploadScreen">
+  <div id="thumbPreview">Drop Thumbnail Here</div>
+  <input type="text" id="promoTitle" placeholder="Enter title (max 30 chars)" maxlength="30" />
+  <input type="url" id="promoLink" placeholder="Enter link to promote" />
+  <input type="color" id="bgColor" value="#222222" />
+  <div style="text-align:center; margin-top: 15px;">
+    <div id="publishingAs" style="margin-bottom: 5px;">Publishing As USERNAME</div>
+    <div id="uploadCount">Promotions: 0</div>
+  </div>
+  <button onclick="publish()">Publish</button>
+  <button id="returnUploadBtn" onclick="closeUpload()">Return</button>
+</div>
+
+<div id="main">
+  <h1>Promo Yourself</h1>
+  <button onclick="openUpload()">Upload</button>
+  <button id="codeButton" onclick="openCode()">Edit</button>
+  <div id="cards"></div>
+</div>
+
+<div id="codeScreen" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: black; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 1000;">
+  <input type="text" id="codeInput" placeholder="Enter secret code" style="margin-bottom: 10px;" />
+  <div style="display: flex; align-items: center; margin: 10px 0;">
+    <label for="mainBgColor" style="margin-right: 10px; white-space: nowrap; color: white;">Background Color</label>
+    <input type="color" id="mainBgColor" value="#000000" style="width: 100px; height: 30px;" />
+  </div>
+  <button onclick="publishCode()">Publish</button>
+  <button id="returnCodeBtn" onclick="closeCode()">Return</button>
+
+  <img id="ownerStarIcon" 
+    src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Five-pointed_star.svg/30px-Five-pointed_star.svg.png"
+    alt="Owner Star" />
+
+  <button id="changeUsernameBtn" style="position: absolute; bottom: 10px; right: 10px;" onclick="showUsernameChange()">Change Username</button>
+  <div id="usernameChangeContainer" style="display:none; margin-top: 10px; text-align: center;">
+    <input type="text" id="newUsernameInput" placeholder="Enter new username" maxlength="20" />
+    <button onclick="changeUsername()">Save</button>
+  </div>
+</div>
+
+<script>
+  const mainDiv = document.getElementById("main");
+  let savedBgColor = localStorage.getItem('mainBgColor') || "#000000";
+  mainDiv.style.backgroundColor = savedBgColor;
+  document.getElementById("mainBgColor").value = savedBgColor;
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAsyNpbQeaRCByyWaMRrAkUfhzj7E7O--A",
+    authDomain: "tank-promo.firebaseapp.com",
+    databaseURL: "https://tank-promo-default-rtdb.firebaseio.com",
+    projectId: "tank-promo",
+    storageBucket: "tank-promo.appspot.com",
+    messagingSenderId: "37421797554",
+    appId: "1:37421797554:web:3f45a74193b7426e98f9ab",
+    measurementId: "G-W6GW8RXL9G"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const database = firebase.database();
+
+  let username = localStorage.getItem('username') || "User123";
+  let selectedImage = null;
+  let uploadCount = 0;
+  let isOwner = false;
+  // Load owner role from localStorage
+  const savedOwnerStatus = localStorage.getItem('isOwner');
+  if (savedOwnerStatus === 'true') {
+    isOwner = true;
+  } else {
+    isOwner = false;
+  }
+
+  const ownerStar = document.getElementById("ownerStarIcon");
+  const starSound = document.getElementById("starSound");
+
+  function openUpload() {
+    document.getElementById("uploadScreen").style.display = "flex";
+    document.getElementById("uploadCount").innerText = "Promotions: " + uploadCount;
+    document.getElementById("publishingAs").innerText = "Publishing As " + username;
+  }
+
+  function closeUpload() {
+    selectedImage = null;
+    document.getElementById("thumbPreview").innerHTML = "Drop Thumbnail Here";
+    document.getElementById("promoTitle").value = "";
+    document.getElementById("promoLink").value = "";
+    document.getElementById("bgColor").value = "#222222";
+    document.getElementById("uploadScreen").style.display = "none";
+  }
+
+  function openCode() {
+    document.getElementById("codeScreen").style.display = "flex";
+    document.getElementById("codeInput").value = "";
+  }
+function publishCode() {
+  const code = document.getElementById("codeInput").value.trim();
+
+  if (code === "BECOMEownerTank") {
+    if (confirm("Are you sure you want to become Owner?")) {
+      alert("You are now the Owner.");
+      alert("You Now Can Delete Peoples Promotions By Clicking On Them");
+      isOwner = true;
+      localStorage.setItem('isOwner', 'true'); // save owner role persistently
+      updateOwnerStar();
+      loadPromos();
+      closeCode();
+      return;
+    }
+  } else if (code === "DELETEownerTank") {
+    if (isOwner) {
+      if (confirm("Are you sure you want to remove Owner status?")) {
+        alert("Owner role removed.");
+        isOwner = false;
+        localStorage.setItem('isOwner', 'false'); // remove owner role
+        updateOwnerStar();
+        loadPromos();
+        closeCode();
+        return;
+      }
+    } else {
+      alert("You are not the Owner.");
+      return;
+    }
+  }
+
+  // If no secret code matched, still save bg color:
+  const color = document.getElementById("mainBgColor").value;
+  mainDiv.style.backgroundColor = color;
+  localStorage.setItem('mainBgColor', color);
+  closeCode();
+}
+
+
+  function closeCode() {
+    document.getElementById("codeScreen").style.display = "none";
+  }
+
+
+  function updateOwnerStar() {
+    if (isOwner) {
+      ownerStar.style.display = "block";
+      ownerStar.classList.add("pulse");
+    } else {
+      ownerStar.style.display = "none";
+      ownerStar.classList.remove("pulse");
+    }
+  }
+
+
+  function showUsernameChange() {
+    document.getElementById("usernameChangeContainer").style.display = "block";
+  }
+
+  function changeUsername() {
+    const newName = document.getElementById("newUsernameInput").value.trim();
+    if (newName.length === 0) {
+      alert("Username cannot be empty.");
+      return;
+    }
+    username = newName;
+    localStorage.setItem('username', username); // save username persistently
+    alert("Username changed to: " + username);
+    document.getElementById("usernameChangeContainer").style.display = "none";
+    if (document.getElementById("uploadScreen").style.display === "flex") {
+      document.getElementById("publishingAs").innerText = "Publishing As " + username;
+    }
+    loadPromos();
+  }
+
+
+  document.getElementById("thumbPreview").addEventListener("dragover", e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  });
+
+  document.getElementById("thumbPreview").addEventListener("drop", e => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        selectedImage = reader.result;
+        document.getElementById("thumbPreview").innerHTML = `<img src="${selectedImage}" />`;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  function publish() {
+    const title = document.getElementById("promoTitle").value.trim();
+    const link = document.getElementById("promoLink").value;
+    const bgColor = document.getElementById("bgColor").value;
+
+    if (!selectedImage || !link || !title) {
+      alert("Image, title, and link are all required.");
+      return;
+    }
+
+    if (title.length > 30) {
+      alert("Title must be 30 characters or less.");
+      return;
+    }
+
+    const data = {
+      title,
+      link,
+      bgColor,
+      thumbnail: selectedImage,
+      username,
+      isOwner: isOwner
+    };
+
+    const id = Date.now();
+    firebase.database().ref("promos/" + id).set(data).then(() => {
+      uploadCount++;
+      closeUpload();
+      loadPromos();
+    });
+  }
+
+  function loadPromos() {
+    const cards = document.getElementById("cards");
+    cards.innerHTML = "";
+
+    firebase.database().ref("promos").once("value", snapshot => {
+      uploadCount = snapshot.numChildren();
+      document.getElementById("uploadCount").innerText = "Promotions: " + uploadCount;
+
+      snapshot.forEach(child => {
+        const data = child.val();
+        const card = document.createElement("div");
+        card.className = "card";
+        card.style.background = data.bgColor || "#222";
+
+        card.innerHTML = `
+          <div class="card-title">
+            ${escapeHtml(data.title)}
+            ${data.isOwner ? '<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Five-pointed_star.svg/20px-Five-pointed_star.svg.png" style="position: absolute; top: 5px; right: 5px; width: 20px;" />' : ''}
+          </div>
+          <div style="font-size: 13px; color: #bbb; text-align: center; margin-top: -6px;">
+            by ${escapeHtml(data.username || "unknown")} ${data.isOwner ? "(Owner)" : ""}
+          </div>
+          <img src="${data.thumbnail}" />
+          <button onclick="window.open('${escapeHtml(data.link)}', '_blank')">Visit Link</button>
+        `;
+
+        if (isOwner) {
+          card.addEventListener("click", e => {
+            if (e.target.tagName.toLowerCase() !== "button") {
+              if (confirm("Delete this promotion?")) {
+                firebase.database().ref("promos/" + child.key).remove().then(() => {
+                  card.remove();
+                  alert("PROMOTION DELETED");
+                  loadPromos();
+                });
+              }
+            }
+          });
+        }
+
+        cards.prepend(card);
+      });
+    });
+  }
+
+  // Prevent injection in displayed data
+  function escapeHtml(text) {
+    return text.replace(/[&<>"']/g, (m) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[m]);
+  }
+
+  window.onload = () => {
+    loadPromos();
+    updateOwnerStar();
+    document.getElementById("publishingAs").innerText = "Publishing As " + username;
+  };
+
+
+
+  ownerStar.addEventListener("click", () => {
+    ownerStar.classList.add("spin");
+    starSound.currentTime = 0;
+    starSound.play();
+    setTimeout(() => {
+      ownerStar.classList.remove("spin");
+    }, 1000);
+  });
+
+</script>
+
+<audio id="starSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+
+</body>
+</html>
